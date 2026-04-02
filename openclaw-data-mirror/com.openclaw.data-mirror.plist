@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+    <!-- Label: must match the filename (without .plist) -->
+    <key>Label</key>
+    <string>com.openclaw.data-mirror</string>
+
+    <!-- Program + arguments -->
+    <key>ProgramArguments</key>
+    <array>
+        <!-- Use the system node; adjust path if using nvm/fnm/homebrew node -->
+        <string>/usr/local/bin/node</string>
+        <string>/Users/n1-02/worldmonitor/openclaw-data-mirror/server.js</string>
+    </array>
+
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PORT</key>
+        <string>9600</string>
+
+        <!-- WorldMonitor local instance -->
+        <key>WM_BASE_URL</key>
+        <string>http://localhost:3000</string>
+
+        <!--
+            NASA FIRMS API key for wildfire data.
+            Get one free at https://firms.modaps.eosdis.nasa.gov/api/
+            Replace the empty string below with your key, then reload the agent.
+        -->
+        <key>NASA_FIRMS_API_KEY</key>
+        <string></string>
+
+        <!-- Pass PATH so node can find system tools if needed -->
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin</string>
+    </dict>
+
+    <!-- Start at login -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Restart automatically if it exits unexpectedly -->
+    <key>KeepAlive</key>
+    <dict>
+        <!-- Only keep alive if it exited unsuccessfully (not on clean shutdown) -->
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- Throttle restarts: wait 10 seconds before restarting after a crash -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Working directory -->
+    <key>WorkingDirectory</key>
+    <string>/Users/n1-02/worldmonitor/openclaw-data-mirror</string>
+
+    <!-- Log files -->
+    <key>StandardOutPath</key>
+    <string>/tmp/openclaw-data-mirror.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/openclaw-data-mirror.err</string>
+
+    <!--
+        Nice value: 0 = normal priority.
+        Set to 10 if you want it to yield to foreground apps.
+    -->
+    <key>Nice</key>
+    <integer>0</integer>
+
+</dict>
+</plist>

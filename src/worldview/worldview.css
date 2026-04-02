@@ -1,0 +1,482 @@
+/* ============================================================
+   WorldView — God Eye Surveillance Page
+   ============================================================ */
+
+:root {
+  --wv-accent: #00ff41;
+  --wv-accent-dim: #00cc33;
+  --wv-accent-faint: rgba(0, 255, 65, 0.12);
+  --wv-bg: #0a0f0a;
+  --wv-surface: rgba(10, 15, 10, 0.88);
+  --wv-surface-solid: #0d120d;
+  --wv-border: rgba(0, 255, 65, 0.18);
+  --wv-border-strong: rgba(0, 255, 65, 0.35);
+  --wv-text: #c8d0c8;
+  --wv-text-bright: #e8ece8;
+  --wv-text-dim: #6a7a6a;
+  --wv-font: 'SF Mono', 'Cascadia Code', 'Fira Code', 'DejaVu Sans Mono', monospace;
+  --wv-radius: 4px;
+}
+
+/* ── Base ──────────────────────────────────────────────────── */
+#worldview-app {
+  position: fixed;
+  inset: 0;
+  background: var(--wv-bg);
+  font-family: var(--wv-font);
+  font-size: 11px;
+  color: var(--wv-text);
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scanline overlay */
+#worldview-app::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.06) 2px,
+    rgba(0, 0, 0, 0.06) 4px
+  );
+  mix-blend-mode: multiply;
+}
+
+/* ── Map Container ─────────────────────────────────────────── */
+.wv-map-container {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  transition: filter 0.4s ease;
+}
+
+.wv-map-container canvas {
+  outline: none;
+}
+
+/* maplibre attribution hide */
+.wv-map-container .maplibregl-ctrl-attrib {
+  display: none;
+}
+
+/* ── Shader Overlays ───────────────────────────────────────── */
+/* Night vision green tint */
+[data-shader="nightvision"] .wv-map-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 255, 65, 0.06);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Thermal warm tint */
+[data-shader="thermal"] .wv-map-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 80, 0, 0.05) 0%, rgba(255, 200, 0, 0.03) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* CRT scanlines + flicker */
+[data-shader="crt"] .wv-map-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 1px,
+    rgba(0, 0, 0, 0.12) 1px,
+    rgba(0, 0, 0, 0.12) 2px
+  );
+  animation: wv-crt-flicker 0.08s infinite alternate;
+}
+
+[data-shader="crt"] .wv-map-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.4) 100%);
+}
+
+@keyframes wv-crt-flicker {
+  0% { opacity: 0.97; }
+  100% { opacity: 1; }
+}
+
+/* Blueprint grid */
+[data-shader="blueprint"] .wv-map-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background-image:
+    linear-gradient(rgba(80, 160, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(80, 160, 255, 0.08) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ── Top Bar ───────────────────────────────────────────────── */
+.wv-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: linear-gradient(180deg, rgba(10, 15, 10, 0.95) 0%, rgba(10, 15, 10, 0.7) 100%);
+  border-bottom: 1px solid var(--wv-border);
+  backdrop-filter: blur(12px);
+}
+
+.wv-topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wv-eye-icon {
+  color: var(--wv-accent);
+  flex-shrink: 0;
+}
+
+.wv-brand-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wv-accent);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.wv-brand-sep {
+  color: var(--wv-text-dim);
+  margin: 0 2px;
+}
+
+.wv-topbar-clock {
+  font-size: 11px;
+  color: var(--wv-text-dim);
+  letter-spacing: 0.06em;
+}
+
+.wv-topbar-nav {
+  font-size: 11px;
+  color: var(--wv-accent-dim);
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  transition: color 0.2s;
+}
+
+.wv-topbar-nav:hover {
+  color: var(--wv-accent);
+}
+
+/* ── Right Panels (layers + shader) ────────────────────────── */
+.wv-layer-panel,
+.wv-shader-panel {
+  position: fixed;
+  right: 16px;
+  z-index: 100;
+  background: var(--wv-surface);
+  border: 1px solid var(--wv-border);
+  border-radius: var(--wv-radius);
+  padding: 10px 12px;
+  backdrop-filter: blur(12px);
+  min-width: 200px;
+}
+
+.wv-layer-panel {
+  top: 56px;
+}
+
+.wv-shader-panel {
+  top: 230px;
+}
+
+.wv-panel-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--wv-accent-dim);
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+/* Layer rows */
+.wv-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.wv-layer-icon {
+  width: 18px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.wv-layer-label {
+  flex: 1;
+  font-size: 10px;
+  color: var(--wv-text);
+  letter-spacing: 0.06em;
+}
+
+.wv-layer-count {
+  font-size: 10px;
+  color: var(--wv-accent-dim);
+  min-width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Toggle switch */
+.wv-toggle {
+  position: relative;
+  width: 32px;
+  height: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--wv-border);
+  background: rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.wv-toggle--on {
+  background: rgba(0, 255, 65, 0.2);
+  border-color: var(--wv-accent-dim);
+}
+
+.wv-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--wv-text-dim);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.wv-toggle--on .wv-toggle-knob {
+  transform: translateX(16px);
+  background: var(--wv-accent);
+}
+
+/* Shader buttons */
+.wv-shader-row {
+  display: flex;
+  gap: 4px;
+}
+
+.wv-shader-btn {
+  flex: 1;
+  padding: 5px 0;
+  font-family: var(--wv-font);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--wv-text-dim);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--wv-border);
+  border-radius: var(--wv-radius);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.wv-shader-btn:hover {
+  color: var(--wv-text);
+  border-color: var(--wv-border-strong);
+}
+
+.wv-shader-btn--active {
+  color: var(--wv-accent);
+  border-color: var(--wv-accent-dim);
+  background: var(--wv-accent-faint);
+}
+
+/* ── Info Panel ────────────────────────────────────────────── */
+.wv-info-panel {
+  position: fixed;
+  bottom: 48px;
+  left: 16px;
+  z-index: 100;
+  background: var(--wv-surface);
+  border: 1px solid var(--wv-border);
+  border-radius: var(--wv-radius);
+  padding: 10px 14px;
+  backdrop-filter: blur(12px);
+  min-width: 220px;
+  max-width: 300px;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.wv-info-panel--hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+}
+
+.wv-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.wv-info-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wv-text-bright);
+  letter-spacing: 0.04em;
+}
+
+.wv-info-close {
+  background: none;
+  border: none;
+  color: var(--wv-text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  font-family: var(--wv-font);
+}
+
+.wv-info-close:hover {
+  color: var(--wv-accent);
+}
+
+.wv-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.wv-info-row:last-child {
+  border-bottom: none;
+}
+
+.wv-info-label {
+  font-size: 9px;
+  color: var(--wv-text-dim);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.wv-info-value {
+  font-size: 10px;
+  color: var(--wv-text-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Status Bar ────────────────────────────────────────────── */
+.wv-statusbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: linear-gradient(0deg, rgba(10, 15, 10, 0.95) 0%, rgba(10, 15, 10, 0.7) 100%);
+  border-top: 1px solid var(--wv-border);
+  backdrop-filter: blur(12px);
+}
+
+.wv-statusbar-feeds {
+  display: flex;
+  gap: 14px;
+}
+
+.wv-feed-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wv-feed-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #555;
+}
+
+.wv-feed-dot--live {
+  background: var(--wv-accent);
+  box-shadow: 0 0 4px var(--wv-accent);
+}
+
+.wv-feed-dot--stale {
+  background: #ffaa00;
+  box-shadow: 0 0 4px rgba(255, 170, 0, 0.5);
+}
+
+.wv-feed-dot--offline {
+  background: #ff3333;
+}
+
+.wv-feed-label {
+  font-size: 9px;
+  color: var(--wv-text-dim);
+  letter-spacing: 0.06em;
+}
+
+.wv-statusbar-center {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.wv-statusbar-counts {
+  font-size: 10px;
+  color: var(--wv-accent-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.wv-statusbar-cursor {
+  font-size: 10px;
+  color: var(--wv-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.wv-statusbar-time {
+  font-size: 10px;
+  color: var(--wv-text-dim);
+  letter-spacing: 0.06em;
+}
+
+/* ── HUD Container (holds panels above map) ────────────────── */
+.wv-hud {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.wv-hud > * {
+  pointer-events: auto;
+}
