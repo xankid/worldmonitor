@@ -5,7 +5,15 @@ import './worldview.css';
 import { GlobeRenderer } from './globe-renderer';
 import { fetchAircraft, fetchSatellitePositions, propagateSatellitesSync, fetchVessels, fetchWebcams } from './data-feeds';
 import { applyShaderMode } from './shader-effects';
-import { createTopBar, createLayerControls, createShaderSelector, createInfoPanel, createStatusBar } from './hud-panels';
+import {
+  createTopBar,
+  createLeftPanel,
+  createRightPanel,
+  createTelemetryBlock,
+  createBottomBar,
+  createInfoPanel,
+  createStatusBar,
+} from './hud-panels';
 import type { LayerVisibility, LayerCounts, FeedStates, ShaderMode } from './types';
 
 // ── State ───────────────────────────────────────────────────────────────────
@@ -18,23 +26,23 @@ async function init(): Promise<void> {
   const app = document.getElementById('worldview-app');
   if (!app) return;
 
-  // Create map container
+  // Map container
   const mapContainer = document.createElement('div');
   mapContainer.className = 'wv-map-container';
   app.appendChild(mapContainer);
 
-  // Create HUD container (pointer-events: none, children get pointer-events: auto)
+  // HUD overlay
   const hud = document.createElement('div');
   hud.className = 'wv-hud';
   app.appendChild(hud);
 
-  // Initialize globe renderer
+  // Globe renderer
   globe = new GlobeRenderer(mapContainer);
 
   // ── HUD Panels ──────────────────────────────────────────────────────────
   const topBar = createTopBar(hud);
 
-  const layerControls = createLayerControls(
+  const leftPanel = createLeftPanel(
     hud,
     { aircraft: true, satellites: true, vessels: true, webcams: true },
     (layer: keyof LayerVisibility, enabled: boolean) => {
@@ -42,32 +50,36 @@ async function init(): Promise<void> {
     },
   );
 
-  createShaderSelector(hud, (mode: ShaderMode) => {
-    applyShaderMode(app, mode);
-  });
+  createRightPanel(hud);
+
+  const telemetry = createTelemetryBlock(hud);
+
+  createBottomBar(
+    hud,
+    (mode: ShaderMode) => { applyShaderMode(app, mode); },
+    (lat: number, lng: number, zoom: number) => { globe?.flyTo(lat, lng, zoom); },
+  );
 
   const infoPanel = createInfoPanel(hud);
-
   const statusBar = createStatusBar(hud);
 
-  // ── Globe event handlers ────────────────────────────────────────────────
+  // ── Globe events ────────────────────────────────────────────────────────
   globe.onMove(({ lat, lng, zoom }) => {
     statusBar.updateCursor(lat, lng, zoom);
+    // Estimate altitude from zoom (rough: alt = 40000000 / 2^zoom meters)
+    const altM = 40_000_000 / Math.pow(2, zoom);
+    telemetry.update(altM, zoom);
   });
 
-  globe.onClick((payload) => {
-    infoPanel.show(payload);
-  });
+  globe.onClick((payload) => { infoPanel.show(payload); });
 
-  // ── Clock tick ──────────────────────────────────────────────────────────
+  // ── Clock ───────────────────────────────────────────────────────────────
   setInterval(() => {
     topBar.updateClock();
     statusBar.updateTime();
   }, 1000);
 
   // ── Data Feeds ──────────────────────────────────────────────────────────
-
-  // Aircraft: fetch every 15 seconds (OpenSky rate limit: 10s for anon)
   async function refreshAircraft(): Promise<void> {
     const { positions, status } = await fetchAircraft();
     feedStates.opensky = status;
@@ -75,12 +87,9 @@ async function init(): Promise<void> {
       layerCounts.aircraft = positions.length;
       globe?.updateAircraft(positions);
     }
-    statusBar.updateFeeds(feedStates);
-    statusBar.updateCounts(layerCounts);
-    layerControls.updateCounts(layerCounts);
+    syncHud();
   }
 
-  // Satellites: init TLEs, then propagate every 3 seconds
   async function initSatellites(): Promise<void> {
     const { positions, status } = await fetchSatellitePositions();
     feedStates.celestrak = status;
@@ -88,23 +97,19 @@ async function init(): Promise<void> {
       layerCounts.satellites = positions.length;
       globe?.updateSatellites(positions);
     }
-    statusBar.updateFeeds(feedStates);
-    statusBar.updateCounts(layerCounts);
-    layerControls.updateCounts(layerCounts);
-
-    // Propagation loop (satellite.js, no network call)
+    syncHud();
+    // Propagation loop (local math, no network)
     setInterval(() => {
       const propagated = propagateSatellitesSync();
       if (propagated.length > 0) {
         layerCounts.satellites = propagated.length;
         globe?.updateSatellites(propagated);
-        layerControls.updateCounts(layerCounts);
+        leftPanel.updateCounts(layerCounts);
         statusBar.updateCounts(layerCounts);
       }
     }, 3000);
   }
 
-  // Vessels: fetch every 30 seconds
   async function refreshVessels(): Promise<void> {
     const { positions, status } = await fetchVessels();
     feedStates.ais = status;
@@ -112,23 +117,24 @@ async function init(): Promise<void> {
       layerCounts.vessels = positions.length;
       globe?.updateVessels(positions);
     }
-    statusBar.updateFeeds(feedStates);
-    statusBar.updateCounts(layerCounts);
-    layerControls.updateCounts(layerCounts);
+    syncHud();
   }
 
-  // Webcams: fetch once, refresh every 5 minutes
   async function refreshWebcams(): Promise<void> {
     const { markers, status } = await fetchWebcams();
     feedStates.webcam = status;
     layerCounts.webcams = markers.length;
     globe?.updateWebcams(markers);
-    statusBar.updateFeeds(feedStates);
-    statusBar.updateCounts(layerCounts);
-    layerControls.updateCounts(layerCounts);
+    syncHud();
   }
 
-  // ── Kick off all feeds ────────────────────────────────────────────────
+  function syncHud(): void {
+    statusBar.updateFeeds(feedStates);
+    statusBar.updateCounts(layerCounts);
+    leftPanel.updateCounts(layerCounts);
+  }
+
+  // ── Kick off ────────────────────────────────────────────────────────────
   void refreshAircraft();
   void initSatellites();
   void refreshVessels();
@@ -138,9 +144,7 @@ async function init(): Promise<void> {
   setInterval(() => void refreshVessels(), 30_000);
   setInterval(() => void refreshWebcams(), 300_000);
 
-  // Initial status bar state
-  statusBar.updateFeeds(feedStates);
-  statusBar.updateCounts(layerCounts);
+  syncHud();
   statusBar.updateCursor(20, 30, 2.5);
 }
 

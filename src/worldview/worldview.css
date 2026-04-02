@@ -1,21 +1,40 @@
 /* ============================================================
    WorldView — God Eye Surveillance Page
+   Inspired by Bilawal Sidhu's WorldView aesthetic
    ============================================================ */
 
 :root {
-  --wv-accent: #00ff41;
-  --wv-accent-dim: #00cc33;
-  --wv-accent-faint: rgba(0, 255, 65, 0.12);
-  --wv-bg: #0a0f0a;
-  --wv-surface: rgba(10, 15, 10, 0.88);
-  --wv-surface-solid: #0d120d;
-  --wv-border: rgba(0, 255, 65, 0.18);
-  --wv-border-strong: rgba(0, 255, 65, 0.35);
-  --wv-text: #c8d0c8;
-  --wv-text-bright: #e8ece8;
-  --wv-text-dim: #6a7a6a;
-  --wv-font: 'SF Mono', 'Cascadia Code', 'Fira Code', 'DejaVu Sans Mono', monospace;
-  --wv-radius: 4px;
+  /* Primary: Cyan / Teal — the dominant UI accent */
+  --wv-cyan: #00d4ff;
+  --wv-cyan-dim: #00a8cc;
+  --wv-cyan-faint: rgba(0, 212, 255, 0.10);
+  --wv-cyan-glow: rgba(0, 212, 255, 0.25);
+
+  /* Secondary: Amber / Gold — branding, classification, warnings */
+  --wv-amber: #d4a84b;
+  --wv-amber-dim: #b08930;
+  --wv-amber-faint: rgba(212, 168, 75, 0.12);
+
+  /* Tertiary: Red — REC indicator, alerts */
+  --wv-red: #ff3b3b;
+
+  /* Surfaces: Navy / Midnight — panel backgrounds */
+  --wv-bg: #080c12;
+  --wv-surface: rgba(12, 20, 32, 0.88);
+  --wv-surface-solid: #0d1520;
+  --wv-surface-hover: rgba(18, 28, 44, 0.92);
+  --wv-border: rgba(0, 180, 220, 0.15);
+  --wv-border-strong: rgba(0, 212, 255, 0.30);
+
+  /* Text */
+  --wv-text: #8899aa;
+  --wv-text-bright: #c8d4e0;
+  --wv-text-dim: #556677;
+  --wv-text-ghost: #334455;
+
+  /* Font */
+  --wv-font: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Courier New', 'DejaVu Sans Mono', monospace;
+  --wv-radius: 2px;
 }
 
 /* ── Base ──────────────────────────────────────────────────── */
@@ -26,12 +45,12 @@
   font-family: var(--wv-font);
   font-size: 11px;
   color: var(--wv-text);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Scanline overlay */
+/* Subtle scanline overlay — always present, very faint */
 #worldview-app::after {
   content: '';
   position: fixed;
@@ -41,9 +60,9 @@
   background: repeating-linear-gradient(
     0deg,
     transparent 0px,
-    transparent 2px,
-    rgba(0, 0, 0, 0.06) 2px,
-    rgba(0, 0, 0, 0.06) 4px
+    transparent 3px,
+    rgba(0, 0, 0, 0.04) 3px,
+    rgba(0, 0, 0, 0.04) 4px
   );
   mix-blend-mode: multiply;
 }
@@ -56,51 +75,41 @@
   transition: filter 0.4s ease;
 }
 
-.wv-map-container canvas {
-  outline: none;
-}
-
-/* maplibre attribution hide */
-.wv-map-container .maplibregl-ctrl-attrib {
-  display: none;
-}
+.wv-map-container canvas { outline: none; }
+.wv-map-container .maplibregl-ctrl-attrib { display: none; }
+.wv-map-container .maplibregl-ctrl { opacity: 0.4; }
 
 /* ── Shader Overlays ───────────────────────────────────────── */
-/* Night vision green tint */
+/* Night Vision — heavy green phosphor */
 [data-shader="nightvision"] .wv-map-container::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(0, 255, 65, 0.06);
+  background: rgba(0, 255, 40, 0.04);
   pointer-events: none;
   z-index: 2;
 }
 
-/* Thermal warm tint */
+/* Thermal / FLIR — warm edge tint */
 [data-shader="thermal"] .wv-map-container::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(255, 80, 0, 0.05) 0%, rgba(255, 200, 0, 0.03) 100%);
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(255, 60, 0, 0.06) 100%);
   pointer-events: none;
   z-index: 2;
 }
 
-/* CRT scanlines + flicker */
-[data-shader="crt"] .wv-map-container::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 2;
+/* CRT — heavy scanlines + vignette + flicker */
+[data-shader="crt"] #worldview-app::after {
   background: repeating-linear-gradient(
     0deg,
     transparent 0px,
     transparent 1px,
-    rgba(0, 0, 0, 0.12) 1px,
-    rgba(0, 0, 0, 0.12) 2px
+    rgba(0, 0, 0, 0.15) 1px,
+    rgba(0, 0, 0, 0.15) 2px
   );
-  animation: wv-crt-flicker 0.08s infinite alternate;
+  animation: wv-crt-flicker 0.05s infinite alternate;
 }
 
 [data-shader="crt"] .wv-map-container::before {
@@ -109,12 +118,22 @@
   inset: 0;
   pointer-events: none;
   z-index: 3;
-  background: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.4) 100%);
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.5) 100%);
 }
 
 @keyframes wv-crt-flicker {
-  0% { opacity: 0.97; }
+  0% { opacity: 0.96; }
   100% { opacity: 1; }
+}
+
+/* Anime — warm soft glow */
+[data-shader="anime"] .wv-map-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(255, 220, 180, 0.04) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 2;
 }
 
 /* Blueprint grid */
@@ -125,152 +144,264 @@
   pointer-events: none;
   z-index: 2;
   background-image:
-    linear-gradient(rgba(80, 160, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(80, 160, 255, 0.08) 1px, transparent 1px);
+    linear-gradient(rgba(80, 160, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(80, 160, 255, 0.06) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
-/* ── Top Bar ───────────────────────────────────────────────── */
+/* Noir — desaturated with film grain feel */
+[data-shader="noir"] .wv-map-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.35) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ── Top Bar — "WORLDVIEW" branding ────────────────────────── */
 .wv-topbar {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: 40px;
   z-index: 100;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  background: linear-gradient(180deg, rgba(10, 15, 10, 0.95) 0%, rgba(10, 15, 10, 0.7) 100%);
-  border-bottom: 1px solid var(--wv-border);
-  backdrop-filter: blur(12px);
+  align-items: flex-start;
+  padding: 8px 16px 0;
+  pointer-events: none;
 }
+
+.wv-topbar > * { pointer-events: auto; }
 
 .wv-topbar-brand {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 1px;
 }
 
-.wv-eye-icon {
-  color: var(--wv-accent);
+.wv-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wv-brand-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--wv-cyan);
+  box-shadow: 0 0 6px var(--wv-cyan-glow);
   flex-shrink: 0;
 }
 
 .wv-brand-text {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--wv-accent);
-  letter-spacing: 0.12em;
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--wv-amber);
+  letter-spacing: 0.28em;
   text-transform: uppercase;
+  font-style: italic;
 }
 
-.wv-brand-sep {
+.wv-brand-tagline {
+  font-size: 8px;
   color: var(--wv-text-dim);
-  margin: 0 2px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-left: 18px;
 }
 
-.wv-topbar-clock {
-  font-size: 11px;
-  color: var(--wv-text-dim);
-  letter-spacing: 0.06em;
-}
-
-.wv-topbar-nav {
-  font-size: 11px;
-  color: var(--wv-accent-dim);
-  text-decoration: none;
-  letter-spacing: 0.06em;
-  transition: color 0.2s;
-}
-
-.wv-topbar-nav:hover {
-  color: var(--wv-accent);
-}
-
-/* ── Right Panels (layers + shader) ────────────────────────── */
-.wv-layer-panel,
-.wv-shader-panel {
+/* ── Telemetry strip (top-left, below brand) ───────────────── */
+.wv-telemetry-strip {
   position: fixed;
+  top: 4px;
+  left: 16px;
+  z-index: 101;
+  font-size: 9px;
+  color: var(--wv-cyan-dim);
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+
+/* ── Classification Banner ─────────────────────────────────── */
+.wv-classification {
+  position: fixed;
+  top: 42px;
+  left: 16px;
+  z-index: 100;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--wv-amber);
+  letter-spacing: 0.08em;
+}
+
+/* ── REC Indicator (top-right) ─────────────────────────────── */
+.wv-rec-block {
+  position: fixed;
+  top: 8px;
   right: 16px;
   z-index: 100;
+  text-align: right;
+}
+
+.wv-rec-line {
+  font-size: 11px;
+  color: var(--wv-text-bright);
+  letter-spacing: 0.05em;
+}
+
+.wv-rec-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--wv-red);
+  box-shadow: 0 0 6px rgba(255, 59, 59, 0.6);
+  margin-right: 6px;
+  animation: wv-rec-blink 1s ease-in-out infinite;
+}
+
+@keyframes wv-rec-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.wv-rec-sub {
+  font-size: 9px;
+  color: var(--wv-text-dim);
+  letter-spacing: 0.06em;
+}
+
+/* ── Active Style indicator (top-right) ────────────────────── */
+.wv-active-style {
+  position: fixed;
+  top: 8px;
+  right: 220px;
+  z-index: 100;
+  text-align: right;
+}
+
+.wv-active-style-label {
+  font-size: 9px;
+  color: var(--wv-text-dim);
+  letter-spacing: 0.06em;
+}
+
+.wv-active-style-value {
+  font-size: 12px;
+  color: var(--wv-text-bright);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+/* ── Left Panel (CCTV / Controls) ──────────────────────────── */
+.wv-left-panel {
+  position: fixed;
+  top: 60px;
+  left: 12px;
+  z-index: 100;
+  width: 260px;
   background: var(--wv-surface);
   border: 1px solid var(--wv-border);
   border-radius: var(--wv-radius);
-  padding: 10px 12px;
-  backdrop-filter: blur(12px);
-  min-width: 200px;
+  padding: 0;
+  backdrop-filter: blur(16px);
 }
 
-.wv-layer-panel {
-  top: 56px;
+.wv-left-panel-header {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--wv-border);
 }
 
-.wv-shader-panel {
-  top: 230px;
-}
-
-.wv-panel-title {
-  font-size: 10px;
+.wv-panel-btn {
+  font-family: var(--wv-font);
+  font-size: 9px;
   font-weight: 600;
-  color: var(--wv-accent-dim);
-  letter-spacing: 0.1em;
-  margin-bottom: 8px;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: var(--wv-radius);
+  border: 1px solid var(--wv-border);
+  cursor: pointer;
+  transition: all 0.15s;
   text-transform: uppercase;
 }
 
-/* Layer rows */
+.wv-panel-btn--cyan {
+  background: var(--wv-cyan-faint);
+  color: var(--wv-cyan);
+  border-color: var(--wv-cyan-dim);
+}
+
+.wv-panel-btn--default {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--wv-text);
+  border-color: var(--wv-border);
+}
+
+.wv-panel-btn--green {
+  background: rgba(0, 200, 100, 0.12);
+  color: #00cc66;
+  border-color: rgba(0, 200, 100, 0.3);
+}
+
+.wv-panel-btn:hover { border-color: var(--wv-cyan); }
+
+/* Layer toggles inside left panel */
+.wv-layer-section {
+  padding: 8px 10px;
+}
+
 .wv-layer-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 0;
+  gap: 6px;
+  padding: 3px 0;
 }
 
-.wv-layer-icon {
-  width: 18px;
-  text-align: center;
-  font-size: 12px;
-}
+.wv-layer-icon { width: 16px; text-align: center; font-size: 11px; }
 
 .wv-layer-label {
   flex: 1;
-  font-size: 10px;
+  font-size: 9px;
   color: var(--wv-text);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .wv-layer-count {
-  font-size: 10px;
-  color: var(--wv-accent-dim);
-  min-width: 40px;
+  font-size: 9px;
+  color: var(--wv-cyan-dim);
+  min-width: 36px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-/* Toggle switch */
+/* Toggle switch — cyan */
 .wv-toggle {
   position: relative;
-  width: 32px;
-  height: 16px;
-  border-radius: 8px;
+  width: 28px;
+  height: 14px;
+  border-radius: 7px;
   border: 1px solid var(--wv-border);
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.5);
   cursor: pointer;
   padding: 0;
   transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
 }
 
 .wv-toggle--on {
-  background: rgba(0, 255, 65, 0.2);
-  border-color: var(--wv-accent-dim);
+  background: var(--wv-cyan-faint);
+  border-color: var(--wv-cyan-dim);
 }
 
 .wv-toggle-knob {
   position: absolute;
-  top: 2px;
-  left: 2px;
+  top: 1px;
+  left: 1px;
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -279,55 +410,347 @@
 }
 
 .wv-toggle--on .wv-toggle-knob {
-  transform: translateX(16px);
-  background: var(--wv-accent);
+  transform: translateX(14px);
+  background: var(--wv-cyan);
+  box-shadow: 0 0 4px var(--wv-cyan-glow);
 }
 
-/* Shader buttons */
-.wv-shader-row {
+/* Slider — cyan dot handles */
+.wv-slider-row {
   display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.wv-slider-label {
+  font-size: 8px;
+  color: var(--wv-text-dim);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  width: 70px;
+  flex-shrink: 0;
+}
+
+.wv-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  background: var(--wv-border);
+  border-radius: 1px;
+  outline: none;
+}
+
+.wv-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--wv-cyan);
+  box-shadow: 0 0 4px var(--wv-cyan-glow);
+  cursor: pointer;
+}
+
+.wv-slider-value {
+  font-size: 9px;
+  color: var(--wv-text-bright);
+  min-width: 28px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* CCTV preview thumbnail */
+.wv-cctv-preview {
+  margin: 6px 10px;
+  border: 1px solid var(--wv-border);
+  border-radius: var(--wv-radius);
+  background: #000;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.wv-cctv-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wv-cctv-placeholder {
+  font-size: 9px;
+  color: var(--wv-text-ghost);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.wv-cctv-status {
+  padding: 4px 10px 6px;
+  font-size: 8px;
+  color: var(--wv-cyan-dim);
+  letter-spacing: 0.04em;
+}
+
+/* Feed info text block */
+.wv-feed-info {
+  padding: 6px 10px 8px;
+  font-size: 8px;
+  color: var(--wv-text-dim);
+  line-height: 1.5;
+  border-top: 1px solid var(--wv-border);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* ── Right Panel (Parameters) ──────────────────────────────── */
+.wv-right-panel {
+  position: fixed;
+  top: 60px;
+  right: 12px;
+  z-index: 100;
+  width: 200px;
+  background: var(--wv-surface);
+  border: 1px solid var(--wv-border);
+  border-radius: var(--wv-radius);
+  padding: 8px 10px;
+  backdrop-filter: blur(16px);
+}
+
+.wv-panel-title {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--wv-text-dim);
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wv-panel-collapse {
+  background: none;
+  border: 1px solid var(--wv-border);
+  color: var(--wv-text-dim);
+  font-size: 10px;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--wv-radius);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--wv-font);
+  line-height: 1;
+}
+
+.wv-panel-collapse:hover { border-color: var(--wv-cyan); color: var(--wv-cyan); }
+
+/* ── Telemetry block (bottom-right) ────────────────────────── */
+.wv-telemetry-br {
+  position: fixed;
+  bottom: 64px;
+  right: 16px;
+  z-index: 100;
+  text-align: right;
+}
+
+.wv-telemetry-line {
+  font-size: 10px;
+  color: var(--wv-text-bright);
+  letter-spacing: 0.05em;
+}
+
+/* ── Bottom Bar — STYLE PRESETS + City Tabs ────────────────── */
+.wv-bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 10px;
+  pointer-events: none;
+}
+
+.wv-bottom-bar > * { pointer-events: auto; }
+
+/* City tabs row */
+.wv-city-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 6px;
+  background: var(--wv-surface);
+  border: 1px solid var(--wv-border);
+  border-radius: var(--wv-radius);
+  padding: 2px;
+  backdrop-filter: blur(12px);
+}
+
+.wv-city-tab {
+  font-family: var(--wv-font);
+  font-size: 9px;
+  color: var(--wv-text-dim);
+  background: transparent;
+  border: none;
+  padding: 4px 10px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  border-radius: var(--wv-radius);
+  transition: all 0.15s;
+}
+
+.wv-city-tab:hover { color: var(--wv-text-bright); }
+
+.wv-city-tab--active {
+  background: var(--wv-cyan-faint);
+  color: var(--wv-cyan);
+  border: 1px solid var(--wv-cyan-dim);
+}
+
+/* Shader presets row */
+.wv-style-presets {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--wv-surface);
+  border: 1px solid var(--wv-border);
+  border-radius: var(--wv-radius);
+  padding: 3px;
+  backdrop-filter: blur(12px);
+}
+
+.wv-style-preset-label {
+  font-size: 8px;
+  color: var(--wv-text-ghost);
+  letter-spacing: 0.06em;
+  padding: 0 6px;
+  text-transform: uppercase;
+}
+
+.wv-style-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--wv-font);
+  font-size: 8px;
+  color: var(--wv-text-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: var(--wv-radius);
+  transition: all 0.15s;
+  min-width: 44px;
+}
+
+.wv-style-btn-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.wv-style-btn:hover { color: var(--wv-text-bright); border-color: var(--wv-border); }
+
+.wv-style-btn--active {
+  background: var(--wv-cyan-faint);
+  color: var(--wv-cyan);
+  border-color: var(--wv-cyan-dim);
+}
+
+/* ── Status Bar (very bottom edge) ─────────────────────────── */
+.wv-statusbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 22px;
+  z-index: 101;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: rgba(8, 12, 18, 0.9);
+  border-top: 1px solid rgba(0, 180, 220, 0.08);
+}
+
+.wv-statusbar-feeds {
+  display: flex;
+  gap: 12px;
+}
+
+.wv-feed-indicator {
+  display: flex;
+  align-items: center;
   gap: 4px;
 }
 
-.wv-shader-btn {
-  flex: 1;
-  padding: 5px 0;
-  font-family: var(--wv-font);
+.wv-feed-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #444;
+}
+
+.wv-feed-dot--live {
+  background: var(--wv-cyan);
+  box-shadow: 0 0 4px var(--wv-cyan-glow);
+}
+
+.wv-feed-dot--stale {
+  background: var(--wv-amber);
+  box-shadow: 0 0 4px var(--wv-amber-faint);
+}
+
+.wv-feed-dot--offline { background: var(--wv-red); }
+
+.wv-feed-label {
+  font-size: 8px;
+  color: var(--wv-text-ghost);
+  letter-spacing: 0.05em;
+}
+
+.wv-statusbar-center {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.wv-statusbar-counts {
   font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  color: var(--wv-cyan-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.wv-statusbar-cursor {
+  font-size: 9px;
   color: var(--wv-text-dim);
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--wv-border);
-  border-radius: var(--wv-radius);
-  cursor: pointer;
-  transition: all 0.2s;
+  font-variant-numeric: tabular-nums;
 }
 
-.wv-shader-btn:hover {
-  color: var(--wv-text);
-  border-color: var(--wv-border-strong);
+.wv-statusbar-time {
+  font-size: 9px;
+  color: var(--wv-text-dim);
+  letter-spacing: 0.05em;
 }
 
-.wv-shader-btn--active {
-  color: var(--wv-accent);
-  border-color: var(--wv-accent-dim);
-  background: var(--wv-accent-faint);
-}
-
-/* ── Info Panel ────────────────────────────────────────────── */
+/* ── Info Panel (on marker click) ──────────────────────────── */
 .wv-info-panel {
   position: fixed;
-  bottom: 48px;
-  left: 16px;
+  bottom: 70px;
+  left: 12px;
   z-index: 100;
   background: var(--wv-surface);
   border: 1px solid var(--wv-border);
   border-radius: var(--wv-radius);
-  padding: 10px 14px;
-  backdrop-filter: blur(12px);
+  padding: 8px 12px;
+  backdrop-filter: blur(16px);
   min-width: 220px;
-  max-width: 300px;
+  max-width: 280px;
   transition: opacity 0.2s, transform 0.2s;
 }
 
@@ -341,11 +764,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .wv-info-title {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--wv-text-bright);
   letter-spacing: 0.04em;
@@ -355,121 +778,66 @@
   background: none;
   border: none;
   color: var(--wv-text-dim);
-  font-size: 16px;
+  font-size: 14px;
   cursor: pointer;
   padding: 0 2px;
   line-height: 1;
   font-family: var(--wv-font);
 }
 
-.wv-info-close:hover {
-  color: var(--wv-accent);
-}
+.wv-info-close:hover { color: var(--wv-cyan); }
 
 .wv-info-row {
   display: flex;
   justify-content: space-between;
   padding: 2px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(0, 180, 220, 0.06);
 }
 
-.wv-info-row:last-child {
-  border-bottom: none;
-}
+.wv-info-row:last-child { border-bottom: none; }
 
 .wv-info-label {
-  font-size: 9px;
+  font-size: 8px;
   color: var(--wv-text-dim);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .wv-info-value {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--wv-text-bright);
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Status Bar ────────────────────────────────────────────── */
-.wv-statusbar {
+/* ── Left Edge Vertical Text ───────────────────────────────── */
+.wv-edge-left {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 28px;
+  left: 4px;
+  top: 50%;
   z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  background: linear-gradient(0deg, rgba(10, 15, 10, 0.95) 0%, rgba(10, 15, 10, 0.7) 100%);
-  border-top: 1px solid var(--wv-border);
-  backdrop-filter: blur(12px);
+  transform: rotate(-90deg) translateX(-50%);
+  transform-origin: left center;
+  font-size: 8px;
+  color: var(--wv-text-ghost);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
 }
 
-.wv-statusbar-feeds {
-  display: flex;
-  gap: 14px;
+/* ── Right Edge Vertical Text ──────────────────────────────── */
+.wv-edge-right {
+  position: fixed;
+  right: 4px;
+  top: 50%;
+  z-index: 100;
+  transform: rotate(90deg) translateX(50%);
+  transform-origin: right center;
+  font-size: 8px;
+  color: var(--wv-text-ghost);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
 }
 
-.wv-feed-indicator {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.wv-feed-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #555;
-}
-
-.wv-feed-dot--live {
-  background: var(--wv-accent);
-  box-shadow: 0 0 4px var(--wv-accent);
-}
-
-.wv-feed-dot--stale {
-  background: #ffaa00;
-  box-shadow: 0 0 4px rgba(255, 170, 0, 0.5);
-}
-
-.wv-feed-dot--offline {
-  background: #ff3333;
-}
-
-.wv-feed-label {
-  font-size: 9px;
-  color: var(--wv-text-dim);
-  letter-spacing: 0.06em;
-}
-
-.wv-statusbar-center {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
-
-.wv-statusbar-counts {
-  font-size: 10px;
-  color: var(--wv-accent-dim);
-  font-variant-numeric: tabular-nums;
-}
-
-.wv-statusbar-cursor {
-  font-size: 10px;
-  color: var(--wv-text-dim);
-  font-variant-numeric: tabular-nums;
-}
-
-.wv-statusbar-time {
-  font-size: 10px;
-  color: var(--wv-text-dim);
-  letter-spacing: 0.06em;
-}
-
-/* ── HUD Container (holds panels above map) ────────────────── */
+/* ── HUD Container ─────────────────────────────────────────── */
 .wv-hud {
   position: fixed;
   inset: 0;
@@ -477,6 +845,50 @@
   pointer-events: none;
 }
 
-.wv-hud > * {
-  pointer-events: auto;
+.wv-hud > * { pointer-events: auto; }
+
+/* ── Location Chip (bottom center, above style presets) ────── */
+.wv-location-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--wv-surface);
+  border: 1px solid var(--wv-border);
+  border-radius: var(--wv-radius);
+  padding: 4px 10px;
+  margin-bottom: 6px;
+  backdrop-filter: blur(12px);
 }
+
+.wv-location-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--wv-red);
+}
+
+.wv-location-name {
+  font-size: 10px;
+  color: var(--wv-text-bright);
+  letter-spacing: 0.04em;
+}
+
+.wv-location-sub {
+  font-size: 9px;
+  color: var(--wv-text-dim);
+}
+
+/* ── Nav link back to Monitor ──────────────────────────────── */
+.wv-topbar-nav {
+  position: fixed;
+  top: 30px;
+  right: 16px;
+  z-index: 100;
+  font-size: 9px;
+  color: var(--wv-text-dim);
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  transition: color 0.2s;
+}
+
+.wv-topbar-nav:hover { color: var(--wv-cyan); }

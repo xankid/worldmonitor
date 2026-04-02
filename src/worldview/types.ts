@@ -29,7 +29,7 @@ export interface WebcamMarker {
   category: string;
 }
 
-export type ShaderMode = 'normal' | 'nightvision' | 'thermal' | 'crt' | 'blueprint';
+export type ShaderMode = 'normal' | 'nightvision' | 'thermal' | 'crt' | 'anime' | 'noir' | 'blueprint';
 
 export interface LayerVisibility {
   aircraft: boolean;
