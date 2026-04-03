@@ -1,6 +1,6 @@
 import { fetchSatelliteTLEs, initSatRecs, propagatePositions } from '@/services/satellites';
 import type { SatRecEntry, SatellitePosition } from '@/services/satellites';
-import type { AircraftPosition, VesselPosition, WebcamMarker, FeedStatus } from './types';
+import type { AircraftPosition, VesselPosition, WebcamMarker, CCTVCamera, FeedStatus } from './types';
 
 // ── Aircraft (OpenSky Network) ──────────────────────────────────────────────
 const OPENSKY_URL = 'https://opensky-network.org/api/states/all';
@@ -127,4 +127,76 @@ export async function fetchWebcams(): Promise<{ markers: WebcamMarker[]; status:
   } catch {
     return { markers: FALLBACK_WEBCAMS, status: 'stale' };
   }
+}
+
+// ── CCTV Traffic Cameras (Austin TX DOT + NYC DOT) ──────────────────────────
+let cctvCache: CCTVCamera[] = [];
+let cctvLastFetch = 0;
+const CCTV_MIN_INTERVAL = 60_000;
+
+async function fetchAustinCCTV(): Promise<CCTVCamera[]> {
+  try {
+    const resp = await fetch('https://its.txdot.gov/data/cctv_json/cctv_austin.json', { signal: AbortSignal.timeout(10_000) });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    const cameras: CCTVCamera[] = [];
+    const items = Array.isArray(data) ? data : data.cameras ?? data.cctv ?? [];
+    for (const c of items) {
+      const lat = Number(c.latitude ?? c.lat ?? 0);
+      const lng = Number(c.longitude ?? c.lon ?? c.lng ?? 0);
+      if (!lat || !lng) continue;
+      cameras.push({
+        id: `atx-${String(c.camera_id ?? c.id ?? cameras.length)}`,
+        name: String(c.camera_name ?? c.name ?? c.location ?? 'Austin Camera'),
+        lat,
+        lng,
+        imageUrl: String(c.image_url ?? c.snapshot_url ?? c.url ?? ''),
+        city: 'Austin, TX',
+        active: true,
+      });
+    }
+    return cameras;
+  } catch {
+    return [];
+  }
+}
+
+// NYC static known camera locations (NYCTMC cameras are numerous)
+const NYC_STATIC_CAMS: CCTVCamera[] = [
+  { id: 'nyc-1', name: 'FDR Drive @ 23rd St', lat: 40.7357, lng: -73.9750, imageUrl: '', city: 'NYC', active: true },
+  { id: 'nyc-2', name: 'Times Square', lat: 40.7580, lng: -73.9855, imageUrl: '', city: 'NYC', active: true },
+  { id: 'nyc-3', name: 'Brooklyn Bridge', lat: 40.7061, lng: -73.9969, imageUrl: '', city: 'NYC', active: true },
+  { id: 'nyc-4', name: 'Holland Tunnel', lat: 40.7270, lng: -74.0117, imageUrl: '', city: 'NYC', active: true },
+  { id: 'nyc-5', name: 'Lincoln Tunnel', lat: 40.7603, lng: -74.0023, imageUrl: '', city: 'NYC', active: true },
+  { id: 'nyc-6', name: 'George Washington Bridge', lat: 40.8517, lng: -73.9527, imageUrl: '', city: 'NYC', active: true },
+  { id: 'nyc-7', name: 'BQE @ Atlantic Ave', lat: 40.6840, lng: -73.9773, imageUrl: '', city: 'NYC', active: true },
+  { id: 'nyc-8', name: 'FDR Drive @ 42nd St', lat: 40.7488, lng: -73.9690, imageUrl: '', city: 'NYC', active: true },
+  { id: 'nyc-9', name: 'West Side Highway @ 57th', lat: 40.7694, lng: -73.9916, imageUrl: '', city: 'NYC', active: true },
+  { id: 'nyc-10', name: 'Queens Midtown Tunnel', lat: 40.7439, lng: -73.9712, imageUrl: '', city: 'NYC', active: true },
+  { id: 'nyc-11', name: 'Verrazano Bridge', lat: 40.6066, lng: -74.0447, imageUrl: '', city: 'NYC', active: true },
+  { id: 'nyc-12', name: 'Cross Bronx Expwy @ Webster', lat: 40.8536, lng: -73.8906, imageUrl: '', city: 'NYC', active: true },
+];
+
+export async function fetchCCTVCameras(): Promise<{ cameras: CCTVCamera[]; status: FeedStatus }> {
+  const now = Date.now();
+  if (now - cctvLastFetch < CCTV_MIN_INTERVAL && cctvCache.length > 0) {
+    return { cameras: cctvCache, status: 'live' };
+  }
+  try {
+    const austinCams = await fetchAustinCCTV();
+    cctvCache = [...austinCams, ...NYC_STATIC_CAMS];
+    cctvLastFetch = Date.now();
+    return { cameras: cctvCache, status: cctvCache.length > 0 ? 'live' : 'offline' };
+  } catch {
+    return { cameras: cctvCache.length > 0 ? cctvCache : NYC_STATIC_CAMS, status: 'stale' };
+  }
+}
+
+/** Sort cameras by distance from a point, return nearest N */
+export function nearestCameras(cameras: CCTVCamera[], lat: number, lng: number, limit = 20): CCTVCamera[] {
+  return [...cameras]
+    .map((c) => ({ cam: c, dist: Math.sqrt((c.lat - lat) ** 2 + (c.lng - lng) ** 2) }))
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, limit)
+    .map((x) => x.cam);
 }

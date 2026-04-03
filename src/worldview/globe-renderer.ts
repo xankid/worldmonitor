@@ -3,7 +3,7 @@ import { MapboxOverlay } from '@deck.gl/mapbox';
 import { ScatterplotLayer, PathLayer } from '@deck.gl/layers';
 import type { PickingInfo } from '@deck.gl/core';
 import type { SatellitePosition } from '@/services/satellites';
-import type { AircraftPosition, VesselPosition, WebcamMarker, MarkerClickPayload } from './types';
+import type { AircraftPosition, VesselPosition, WebcamMarker, CCTVCamera, MarkerClickPayload } from './types';
 
 const SAT_COLORS: Record<string, [number, number, number]> = {
   CN: [255, 32, 32],
@@ -26,7 +26,8 @@ export class GlobeRenderer {
   private satellites: SatellitePosition[] = [];
   private vessels: VesselPosition[] = [];
   private webcams: WebcamMarker[] = [];
-  private visibleLayers = { aircraft: true, satellites: true, vessels: true, webcams: true };
+  private cctv: CCTVCamera[] = [];
+  private visibleLayers = { aircraft: true, satellites: true, vessels: true, webcams: true, cctv: true };
   private clickCallback: ((payload: MarkerClickPayload) => void) | null = null;
   private moveCallback: ((data: { lat: number; lng: number; zoom: number }) => void) | null = null;
 
@@ -75,6 +76,8 @@ export class GlobeRenderer {
       this.clickCallback({ type: 'vessel', data: obj });
     } else if (obj._wvType === 'webcam') {
       this.clickCallback({ type: 'webcam', data: obj });
+    } else if (obj._wvType === 'cctv') {
+      this.clickCallback({ type: 'cctv', data: obj });
     }
   }
 
@@ -100,6 +103,11 @@ export class GlobeRenderer {
 
   updateWebcams(markers: WebcamMarker[]): void {
     this.webcams = markers;
+    this.rebuildLayers();
+  }
+
+  updateCCTV(cameras: CCTVCamera[]): void {
+    this.cctv = cameras;
     this.rebuildLayers();
   }
 
@@ -181,6 +189,21 @@ export class GlobeRenderer {
           getRadius: 25000,
           radiusMinPixels: 3,
           radiusMaxPixels: 7,
+          pickable: true,
+        }),
+      );
+    }
+
+    if (this.visibleLayers.cctv && this.cctv.length > 0) {
+      layers.push(
+        new ScatterplotLayer({
+          id: 'wv-cctv',
+          data: this.cctv.map((c) => ({ ...c, _wvType: 'cctv' })),
+          getPosition: (d: CCTVCamera) => [d.lng, d.lat],
+          getFillColor: [255, 100, 0, 200],
+          getRadius: 15000,
+          radiusMinPixels: 3,
+          radiusMaxPixels: 8,
           pickable: true,
         }),
       );

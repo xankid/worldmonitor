@@ -3,83 +3,127 @@ import '../styles/main.css';
 import './worldview.css';
 
 import { GlobeRenderer } from './globe-renderer';
-import { fetchAircraft, fetchSatellitePositions, propagateSatellitesSync, fetchVessels, fetchWebcams } from './data-feeds';
-import { applyShaderMode } from './shader-effects';
+import { fetchAircraft, fetchSatellitePositions, propagateSatellitesSync, fetchVessels, fetchWebcams, fetchCCTVCameras } from './data-feeds';
+import { applyViewMode } from './shader-effects';
 import {
-  createTopBar,
   createLeftPanel,
   createRightPanel,
-  createTelemetryBlock,
-  createBottomBar,
-  createInfoPanel,
-  createStatusBar,
+  createScopeOverlay,
+  createClassificationBanner,
+  createTimelineBar,
+  createCCTVPanel,
 } from './hud-panels';
-import type { LayerVisibility, LayerCounts, FeedStates, ShaderMode } from './types';
+import type { CCTVCamera } from './types';
+import type { LayerVisibility, LayerCounts, FeedStates, ViewMode } from './types';
 
 // ── State ───────────────────────────────────────────────────────────────────
-const layerCounts: LayerCounts = { aircraft: 0, satellites: 0, vessels: 0, webcams: 0 };
-const feedStates: FeedStates = { opensky: 'offline', celestrak: 'offline', ais: 'offline', webcam: 'offline' };
+const layerCounts: LayerCounts = { aircraft: 0, satellites: 0, vessels: 0, webcams: 0, cctv: 0 };
+const feedStates: FeedStates = { opensky: 'offline', celestrak: 'offline', ais: 'offline', webcam: 'offline', cctv: 'offline' };
+let cctvCameras: CCTVCamera[] = [];
 let globe: GlobeRenderer | null = null;
+let currentViewMode: ViewMode = 'eo';
 
 // ── Bootstrap ───────────────────────────────────────────────────────────────
 async function init(): Promise<void> {
   const app = document.getElementById('worldview-app');
   if (!app) return;
 
-  // Map container
-  const mapContainer = document.createElement('div');
-  mapContainer.className = 'wv-map-container';
-  app.appendChild(mapContainer);
+  // ── Top classification banner ──────────────────────────────────────────
+  const topBanner = createClassificationBanner('top');
+  app.appendChild(topBanner);
 
-  // HUD overlay
-  const hud = document.createElement('div');
-  hud.className = 'wv-hud';
-  app.appendChild(hud);
+  // ── 3-column layout ────────────────────────────────────────────────────
+  const layout = document.createElement('div');
+  layout.className = 'wv-layout';
+  app.appendChild(layout);
 
-  // Globe renderer
-  globe = new GlobeRenderer(mapContainer);
+  // ── Bottom classification banner ───────────────────────────────────────
+  const bottomBanner = createClassificationBanner('bottom');
+  app.appendChild(bottomBanner);
 
-  // ── HUD Panels ──────────────────────────────────────────────────────────
-  const topBar = createTopBar(hud);
-
-  const leftPanel = createLeftPanel(
-    hud,
+  // ── LEFT PANEL ─────────────────────────────────────────────────────────
+  const leftControls = createLeftPanel(
+    layout,
     { aircraft: true, satellites: true, vessels: true, webcams: true },
     (layer: keyof LayerVisibility, enabled: boolean) => {
       globe?.setLayerVisibility({ [layer]: enabled });
     },
+    (mode: ViewMode) => {
+      currentViewMode = mode;
+      if (scopeViewport && mapContainer) {
+        applyViewMode(scopeViewport, mapContainer, mode);
+      }
+      rightControls.setViewMode(mode);
+    },
+    (lat: number, lon: number) => {
+      globe?.flyTo(lat, lon, 2000000);
+    },
   );
 
-  createRightPanel(hud);
+  // ── CENTER column ──────────────────────────────────────────────────────
+  const center = document.createElement('div');
+  center.className = 'wv-center';
+  layout.appendChild(center);
 
-  const telemetry = createTelemetryBlock(hud);
+  // Scope container (circular viewport)
+  const scopeContainer = document.createElement('div');
+  scopeContainer.className = 'wv-scope-container';
+  center.appendChild(scopeContainer);
 
-  createBottomBar(
-    hud,
-    (mode: ShaderMode) => { applyShaderMode(app, mode); },
-    (lat: number, lng: number, zoom: number) => { globe?.flyTo(lat, lng, zoom); },
+  const scopeViewport = document.createElement('div');
+  scopeViewport.className = 'wv-scope-viewport';
+  scopeContainer.appendChild(scopeViewport);
+
+  // Map container inside the circular clip
+  const mapContainer = document.createElement('div');
+  mapContainer.className = 'wv-map-container';
+  scopeViewport.appendChild(mapContainer);
+
+  // Scope SVG overlay (crosshairs, range rings, compass, vignette)
+  const scopeOverlaySvg = createScopeOverlay();
+  scopeContainer.appendChild(scopeOverlaySvg);
+
+  // Timeline bar below the scope
+  const timelineBar = createTimelineBar();
+  center.appendChild(timelineBar);
+
+  // Nav back link
+  const navBack = document.createElement('a');
+  navBack.className = 'wv-nav-back';
+  navBack.href = '/';
+  navBack.textContent = '← MONITOR';
+  app.appendChild(navBack);
+
+  // ── CCTV Panel (in left panel, after layers) ─────────────────────────────
+  const leftInner = layout.querySelector('.wv-panel-left-inner') as HTMLElement;
+  const cctvPanel = createCCTVPanel(
+    leftInner,
+    (cam: CCTVCamera) => {
+      globe?.flyTo(cam.lat, cam.lng, 14);
+    },
   );
 
-  const infoPanel = createInfoPanel(hud);
-  const statusBar = createStatusBar(hud);
+  // ── RIGHT PANEL ────────────────────────────────────────────────────────
+  const rightControls = createRightPanel(layout);
 
-  // ── Globe events ────────────────────────────────────────────────────────
-  globe.onMove(({ lat, lng, zoom }) => {
-    statusBar.updateCursor(lat, lng, zoom);
-    // Estimate altitude from zoom (rough: alt = 40000000 / 2^zoom meters)
-    const altM = 40_000_000 / Math.pow(2, zoom);
-    telemetry.update(altM, zoom);
+  // ── Globe renderer ─────────────────────────────────────────────────────
+  globe = new GlobeRenderer(mapContainer);
+
+  // ── Globe events ───────────────────────────────────────────────────────
+  globe.onMove(({ lat, lng }) => {
+    rightControls.updatePosition(lat, lng);
   });
 
-  globe.onClick((payload) => { infoPanel.show(payload); });
+  globe.onClick((payload) => {
+    rightControls.showEntity(payload);
+  });
 
-  // ── Clock ───────────────────────────────────────────────────────────────
+  // ── Clock ──────────────────────────────────────────────────────────────
   setInterval(() => {
-    topBar.updateClock();
-    statusBar.updateTime();
+    rightControls.updateClock();
   }, 1000);
 
-  // ── Data Feeds ──────────────────────────────────────────────────────────
+  // ── Data Feeds ─────────────────────────────────────────────────────────
   async function refreshAircraft(): Promise<void> {
     const { positions, status } = await fetchAircraft();
     feedStates.opensky = status;
@@ -98,14 +142,13 @@ async function init(): Promise<void> {
       globe?.updateSatellites(positions);
     }
     syncHud();
-    // Propagation loop (local math, no network)
+    // Propagation loop
     setInterval(() => {
       const propagated = propagateSatellitesSync();
       if (propagated.length > 0) {
         layerCounts.satellites = propagated.length;
         globe?.updateSatellites(propagated);
-        leftPanel.updateCounts(layerCounts);
-        statusBar.updateCounts(layerCounts);
+        leftControls.updateCounts(layerCounts);
       }
     }, 3000);
   }
@@ -128,24 +171,45 @@ async function init(): Promise<void> {
     syncHud();
   }
 
-  function syncHud(): void {
-    statusBar.updateFeeds(feedStates);
-    statusBar.updateCounts(layerCounts);
-    leftPanel.updateCounts(layerCounts);
+  async function refreshCCTV(): Promise<void> {
+    const { cameras, status } = await fetchCCTVCameras();
+    feedStates.cctv = status;
+    layerCounts.cctv = cameras.length;
+    cctvCameras = cameras;
+    globe?.updateCCTV(cameras);
+    const center = globe?.getCenter() ?? { lat: 30, lng: -97 };
+    cctvPanel.updateCameras(cameras, center.lat, center.lng);
+    syncHud();
   }
 
-  // ── Kick off ────────────────────────────────────────────────────────────
+  function syncHud(): void {
+    leftControls.updateCounts(layerCounts);
+  }
+
+  // ── Kick off ───────────────────────────────────────────────────────────
   void refreshAircraft();
   void initSatellites();
   void refreshVessels();
   void refreshWebcams();
+  void refreshCCTV();
 
   setInterval(() => void refreshAircraft(), 15_000);
   setInterval(() => void refreshVessels(), 30_000);
   setInterval(() => void refreshWebcams(), 300_000);
+  setInterval(() => void refreshCCTV(), 120_000);
+
+  // Update CCTV list on map move (sorted by distance from center)
+  let cctvUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+  globe?.onMove(({ lat, lng }) => {
+    if (cctvUpdateTimer) clearTimeout(cctvUpdateTimer);
+    cctvUpdateTimer = setTimeout(() => {
+      if (cctvCameras.length > 0) {
+        cctvPanel.updateCameras(cctvCameras, lat, lng);
+      }
+    }, 500);
+  });
 
   syncHud();
-  statusBar.updateCursor(20, 30, 2.5);
 }
 
 void init().catch(console.error);

@@ -3,12 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https: http://localhost:5173 ws: wss: blob: data:; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; worker-src 'self' blob:; font-src 'self' data: https:; media-src 'self' data: blob: https:; frame-src 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https: http://localhost:5173 ws: wss: blob: data:; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; worker-src 'self' blob:; font-src 'self' data: https:; media-src 'self' data: blob: https:; frame-src 'self';\" />
     <title>WorldView — God Eye Surveillance</title>
-    <script>(function(){try{var t=localStorage.getItem('worldmonitor-theme');if(t==='light')document.documentElement.dataset.theme='light';}catch(e){}document.documentElement.classList.add('no-transition');})()</script>
   </head>
-  <body style="margin:0;background:#0a0f0a;color:#e8eaed;overflow:hidden">
+  <body style="margin:0;background:#000a00;color:#00ff41;overflow:hidden">
     <div id="worldview-app"></div>
+
+    <!-- FLIR SVG filter definitions — must be outside overflow:hidden containers -->
+    <svg class="wv-flir-defs" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+      <defs>
+        <filter id="flir-filter">
+          <feColorMatrix
+            type="matrix"
+            values="0.3 0.3 0.3 0 0
+                    0.1 0.1 0.1 0 0
+                    0.8 0.8 0.8 0 0
+                    0   0   0   1 0"
+          />
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues="0 0 0.2 0.5 0.8 1 1" />
+            <feFuncG type="table" tableValues="0 0 0.1 0.2 0.4 0.6 0.2" />
+            <feFuncB type="table" tableValues="0.5 0.4 0.3 0.2 0.1 0 0" />
+          </feComponentTransfer>
+        </filter>
+      </defs>
+    </svg>
+
     <script type="module" src="/src/worldview/worldview-main.ts"></script>
   </body>
 </html>
